@@ -4,6 +4,10 @@ import dev.wolzard.recon.core.model.AnalysisInput
 import dev.wolzard.recon.core.model.AnalysisResult
 import dev.wolzard.recon.core.model.Source
 
+interface PromptGenerator {
+    suspend fun generate(prompt: String): String
+}
+
 interface VideoAnalyzer {
     val supportsYouTubeUrl: Boolean
     /** One logical call (D9). [userContext] (D23) rides in the same call; null = none. @throws AnalyzerException */

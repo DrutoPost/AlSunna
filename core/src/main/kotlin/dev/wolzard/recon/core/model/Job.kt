@@ -43,13 +43,14 @@ data class Job(
 /** Persisted as JSON in JobEntity.resultJson. */
 @Serializable
 data class JobResult(
-    val analysis: AnalysisResult,
-    val findings: List<Finding>,
-    val sources: List<Source>,                       // per job (D17), grounded researcher only
-    val searchSuggestionsHtml: String?,              // groundingMetadata.searchEntryPoint.renderedContent
-    val path: String,                                // "youtube-url" | "A" | "B"
-    val models: Map<String, String> = emptyMap(),    // "analyse"/"research" → model id that answered
-    val degraded: Map<String, Long?> = emptyMap(),   // researcher id or "budget" → retryAt epoch ms (null = unknown)
+    val analysis: AnalysisResult = AnalysisResult(emptyList(), "", 0.0, emptyList(), null),
+    val findings: List<Finding> = emptyList(),
+    val sources: List<Source> = emptyList(),                       // per job (D17), grounded researcher only
+    val searchSuggestionsHtml: String? = null,                    // groundingMetadata.searchEntryPoint.renderedContent
+    val path: String = "gemini-web",                               // execution path
+    val models: Map<String, String> = emptyMap(),                 // "analyse"/"research" → model id that answered
+    val degraded: Map<String, Long?> = emptyMap(),                // researcher id or "budget" → retryAt epoch ms (null = unknown)
+    val markdown: String? = null,                                 // Google's direct markdown response for the prompt
 )
 
 class AnalyzerException(

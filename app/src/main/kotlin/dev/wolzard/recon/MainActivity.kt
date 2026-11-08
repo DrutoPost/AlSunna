@@ -72,8 +72,7 @@ class MainActivity : ComponentActivity() {
 
     private fun show(outcome: ShareOutcome?) = when (outcome) {
         is ShareOutcome.Started -> openJob.value = outcome.jobId
-        is ShareOutcome.NeedsContext -> openContext.value = outcome.link
-        is ShareOutcome.FileNeedsContext, null -> Unit // only the share sheet asks for it
+        null -> Unit
     }
 
     /** True once the first Compose frame is up; the splash stays until then so there is no blank flash. */

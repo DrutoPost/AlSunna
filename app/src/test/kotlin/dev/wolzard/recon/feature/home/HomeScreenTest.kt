@@ -55,11 +55,11 @@ class HomeScreenTest {
         val intents = mutableListOf<HomeIntent>()
         compose.setContent { HomeScreen(HomeState(pasteError = "That isn't a video link.")) { intents += it } }
         compose.onNodeWithText("That isn't a video link.").assertExists()
-        compose.onNodeWithText("Paste a video link").performTextInput("https://youtu.be/x")
-        compose.onNodeWithText("Start recon").performClick()
+        compose.onNodeWithText("Paste an alsunna.net link").performTextInput("https://alsunna.net/hadith/772")
+        compose.onNodeWithText("Translate hadith").performClick()
         compose.onNodeWithContentDescription("Paste from clipboard").performClick() // empty clipboard in the test: clears the field
-        compose.onNodeWithText("Start recon").performClick()
-        assertEquals(listOf<HomeIntent>(HomeIntent.PasteLink("https://youtu.be/x"), HomeIntent.PasteLink("")), intents)
+        compose.onNodeWithText("Translate hadith").performClick()
+        assertEquals(listOf<HomeIntent>(HomeIntent.PasteLink("https://alsunna.net/hadith/772"), HomeIntent.PasteLink("")), intents)
     }
 
     @Test fun relativeTimes() {

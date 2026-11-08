@@ -11,28 +11,31 @@ sealed interface Route {
 object LinkRouter {
     private val urlRe = Regex("""https?://[^\s<>"]+""", RegexOption.IGNORE_CASE)
     private const val TRAILING = ".,;:!?…'\"]}>*"
-    private val youTubeHosts = setOf("youtube.com", "youtu.be")
-    private val knownPlatforms = setOf(
-        "youtube.com", "youtu.be", "instagram.com", "tiktok.com", "x.com", "twitter.com",
-        "facebook.com", "fb.watch", "reddit.com",
-    )
+    const val REQUIRED_HOST = "alsunna.net"
 
     /** First valid http(s) URL in [text], with trailing punctuation trimmed; null if none. */
     fun extractUrl(text: String): String? = urlRe.findAll(text)
         .map { trim(it.value) }
         .firstOrNull { host(it) != null }
 
-    /** The one check for a share or paste (D23): the first http(s) link in [text], or null. Run before the context screen and again at Start. */
-    fun validLink(text: String): String? = extractUrl(text)?.takeIf(::isWebUrl)
+    /** Accepts only http(s) links specifically targeting alsunna.net (strictly no subdomains). */
+    fun validLink(text: String): String? = extractUrl(text)?.takeIf(::isAlsunnaUrl)
 
-    /** Only absolute http(s) URLs with a real host may reach the network or yt-dlp (no file:, intent:, javascript:, …). */
+    fun isAlsunnaUrl(url: String): Boolean = runCatching { URI(url) }.getOrNull()
+        ?.let { uri ->
+            val scheme = uri.scheme?.lowercase()
+            val h = host(url)
+            (scheme == "http" || scheme == "https") && h == REQUIRED_HOST
+        } ?: false
+
+    /** Only absolute http(s) URLs with a real host may reach the network. */
     fun isWebUrl(url: String): Boolean = runCatching { URI(url) }.getOrNull()
         ?.let { it.scheme?.lowercase() in setOf("http", "https") && host(url) != null } ?: false
 
-    fun classify(url: String): Route = if (matches(host(url), youTubeHosts)) Route.YouTube(url) else Route.Other(url)
+    fun classify(url: String): Route = Route.Other(url)
 
     /** Short links and unknown hosts are resolved (redirects followed) before classifying. */
-    fun needsResolving(url: String): Boolean = !matches(host(url), knownPlatforms)
+    fun needsResolving(url: String): Boolean = false
 
     private fun trim(raw: String): String {
         var s = raw

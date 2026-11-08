@@ -1,15 +1,12 @@
 package dev.wolzard.recon.core.job
 
 import dev.wolzard.recon.core.link.LinkRouter
-import dev.wolzard.recon.core.link.Route
-import dev.wolzard.recon.core.model.AnalysisInput
 import dev.wolzard.recon.core.model.AnalysisResult
 import dev.wolzard.recon.core.model.AnalyzerException
 import dev.wolzard.recon.core.model.FailureReason
 import dev.wolzard.recon.core.model.Job
 import dev.wolzard.recon.core.model.JobResult
 import dev.wolzard.recon.core.model.JobState
-import dev.wolzard.recon.core.model.ResearchContext
 import dev.wolzard.recon.core.port.Analysis
 import dev.wolzard.recon.core.port.FetchQuality
 import dev.wolzard.recon.core.port.FetchedMedia
@@ -17,10 +14,11 @@ import dev.wolzard.recon.core.port.FrameSampler
 import dev.wolzard.recon.core.port.JobStore
 import dev.wolzard.recon.core.port.LinkResolver
 import dev.wolzard.recon.core.port.MediaFetcher
+import dev.wolzard.recon.core.port.PromptGenerator
 import dev.wolzard.recon.core.port.VideoAnalyzer
+import dev.wolzard.recon.core.prompt.Prompts
 import dev.wolzard.recon.core.research.ResearchChain
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import java.io.File
@@ -37,17 +35,16 @@ data class Timeouts(
 
 enum class UserAction {
     RUN,             // first run, Retry, or resume after process death
-    RESEARCH_ONLY,   // "Check again" / "Look up": research from the saved analysis (1 call)
-    TRY_SHARPER,     // D21: re-download ≤ 720p and re-analyse
+    RESEARCH_ONLY,   // "Check again"
+    TRY_SHARPER,
 }
 
-/** analysisJson payload: lets Retry/Check again resume at RESEARCHING without paying for analysis again (D7). */
 @Serializable
 data class SavedAnalysis(val result: AnalysisResult, val model: String, val path: String)
 
 /**
- * The pipeline (plan → Pipeline, State machine). Only RunJob writes `state`. At most 2 AI calls per invocation
- * (D9); every exit path deletes `jobs/<id>/`; a shared-file copy is deleted once the job is DONE or FAILED.
+ * RunJob executes the hadith translation request:
+ * Takes the alsunna.net URL, formats the prompt, and queries Google Gemini.
  */
 class RunJob(
     private val store: JobStore,
@@ -57,185 +54,66 @@ class RunJob(
     private val analyzer: VideoAnalyzer,
     private val research: ResearchChain,
     private val language: () -> Language,
-    /** Earliest retryAt when every model's quota is known to be used up; null when some model has quota. */
     private val quotaWaitUntil: () -> Long?,
     private val workRoot: File,
     private val sharedRoot: File = File(workRoot, "shared"),
     private val clock: () -> Long = System::currentTimeMillis,
     private val timeouts: Timeouts = Timeouts(),
+    private val webClient: PromptGenerator? = null,
 ) {
     private val json = Json { ignoreUnknownKeys = true }
 
     suspend operator fun invoke(jobId: String, action: UserAction = UserAction.RUN) {
         val job = store.get(jobId) ?: return
-        val dir = File(workRoot, "jobs/$jobId")
-        var finished = false
         try {
             quotaWaitUntil()?.let { retryAt ->
                 store.update(jobId) { it.copy(state = JobState.WAITING_QUOTA, retryAtEpochMs = retryAt, progress = null) }
                 return
             }
-            val budget = CallBudget(MAX_CALLS)
-            val saved = job.analysisJson?.takeIf { action != UserAction.TRY_SHARPER }
-                ?.let { runCatching { json.decodeFromString(SavedAnalysis.serializer(), it) }.getOrNull() }
-            val analysis = saved ?: analyse(job, dir, action, budget)
-            if (saved == null) store.update(jobId) { it.copy(analysisJson = json.encodeToString(SavedAnalysis.serializer(), analysis), analysedAt = clock()) }
 
-            val lang = language()
-            val models = mapOf("analyse" to analysis.model)
-            val result = if (analysis.result.entities.isEmpty()) {
-                JobResult(analysis.result, emptyList(), emptyList(), null, analysis.path, models) // valid "nothing to look up"
+            val url = LinkRouter.validLink(job.url ?: job.sharedText)
+            if (url == null) {
+                fail(jobId, FailureReason.UNSUPPORTED_LINK, "Only alsunna.net links are supported", null)
+                return
+            }
+
+            store.update(jobId) { it.copy(state = JobState.ANALYSING, startedAt = clock(), progress = null) }
+            val prompt = Prompts.hadithTranslation(url)
+            val reply = if (webClient != null) {
+                webClient.generate(prompt)
             } else {
-                store.update(jobId) { it.copy(state = JobState.RESEARCHING, progress = null) }
-                val ctx = ResearchContext(analysis.result.summary, lang.display, lang.tag)
-                val out = research.run(analysis.result.entities, ctx, budgetLeft = budget.remaining > 0)
-                JobResult(
-                    analysis.result, out.findings, out.sources, out.searchSuggestionsHtml, analysis.path,
-                    models + listOfNotNull(out.model?.let { "research" to it }), out.degraded,
+                // Fallback for tests or interfaces using analyzer
+                analyzer.analyze(dev.wolzard.recon.core.model.AnalysisInput.YouTubeUrl(url), "bn", null).result.summary
+            }
+
+            val jobResult = JobResult(
+                analysis = AnalysisResult(entities = emptyList(), summary = reply, confidence = 1.0, onScreenText = emptyList(), answer = null),
+                markdown = reply,
+                path = "gemini-web",
+                models = mapOf("analyse" to "gemini-web"),
+            )
+
+            store.update(jobId) {
+                it.copy(
+                    state = JobState.DONE,
+                    resultJson = json.encodeToString(JobResult.serializer(), jobResult),
+                    analysedAt = clock(),
+                    failure = null,
+                    failureDetail = null,
+                    retryAtEpochMs = null,
+                    progress = null,
                 )
             }
-            store.update(jobId) {
-                it.copy(state = JobState.DONE, resultJson = json.encodeToString(JobResult.serializer(), result),
-                    failure = null, failureDetail = null, retryAtEpochMs = null, progress = null)
-            }
-            finished = true
         } catch (e: CancellationException) {
-            throw e // the worker resumes or the user cancelled; the job dir still goes in finally
+            throw e
         } catch (e: AnalyzerException) {
             fail(jobId, e.reason, e.message, e.retryAtEpochMs)
-            finished = true
         } catch (e: Exception) {
             fail(jobId, FailureReason.UNKNOWN, "${e::class.simpleName}: ${e.message}", null)
-            finished = true
-        } finally {
-            dir.deleteRecursively()
-            if (finished) deleteSharedCopy(job.localUri)
         }
-    }
-
-    private suspend fun analyse(job: Job, dir: File, action: UserAction, budget: CallBudget): SavedAnalysis {
-        val url = LinkRouter.extractUrl(job.sharedText)
-        val local = job.localUri
-        if (url == null && local == null) throw AnalyzerException(FailureReason.UNSUPPORTED_LINK)
-        val lang = language().display
-        // D28: a new run record; the step card times count from here.
-        store.update(job.id) {
-            it.copy(startedAt = clock(), downloadedAt = null, sampledAt = null, analysedAt = null, downloadBytes = null, frameCount = null, hasAudio = null)
-        }
-
-        var lastError: AnalyzerException? = null
-        if (local == null) {
-            val resolved = if (LinkRouter.needsResolving(url!!)) resolver.resolve(url) else url
-            store.update(job.id) { it.copy(url = resolved) }
-            if (LinkRouter.classify(resolved) is Route.YouTube && analyzer.supportsYouTubeUrl && action != UserAction.TRY_SHARPER) {
-                store.update(job.id) { it.copy(state = JobState.ANALYSING, sampledAt = clock()) } // the model reads the video itself
-                when (val r = attempt(budget, timeouts.pathA) { analyzer.analyze(AnalysisInput.YouTubeUrl(resolved), lang, job.userContext) }) {
-                    is Attempt.Ok -> return SavedAnalysis(r.analysis.result, r.analysis.model, "youtube-url")
-                    is Attempt.Failed -> lastError = r.error // falls through to the download path
-                }
-            }
-            return analyseDownload(job, dir, resolved, fetchers.link, action, budget, lang, lastError)
-        }
-        return analyseDownload(job, dir, local, fetchers.sharedFile, action, budget, lang, null)
-    }
-
-    private suspend fun analyseDownload(
-        job: Job, dir: File, source: String, fetcher: MediaFetcher, action: UserAction,
-        budget: CallBudget, lang: String, previous: AnalyzerException?,
-    ): SavedAnalysis {
-        var lastError = previous
-        store.update(job.id) { it.copy(state = JobState.DOWNLOADING, progress = 0f) }
-        val quality = if (action == UserAction.TRY_SHARPER) FetchQuality.SHARPER else FetchQuality.DEFAULT
-        var media = fetch(job.id, fetcher, source, dir, quality, null)
-
-        // Path A: a muxed file ≤ 50 MB. YouTube's two-file download (separate audio) goes straight to Path B.
-        if (media.audio == null && media.video.length() <= timeouts.maxPathABytes) {
-            if (!budget.canSpend()) throw lastError ?: AnalyzerException(FailureReason.UNKNOWN, message = "call budget used up")
-            store.update(job.id) { it.copy(state = JobState.ANALYSING, progress = null, sampledAt = clock()) } // sent whole; no frames of ours
-            when (val r = attempt(budget, timeouts.pathA) { analyzer.analyze(AnalysisInput.VideoFile(media.video, mime(media.video)), lang, job.userContext) }) {
-                is Attempt.Ok -> return SavedAnalysis(r.analysis.result, r.analysis.model, "A")
-                is Attempt.Failed -> lastError = r.error
-            }
-        }
-
-        // Path B: frames + audio. Zero frames is never a success: one other-format re-download for links, then fail.
-        store.update(job.id) { it.copy(state = JobState.ANALYSING, progress = null, sampledAt = null) }
-        var frames = sampler.sample(media.video, File(dir, "frames"))
-        if (frames.frames.isEmpty() && fetcher === fetchers.link) {
-            media = fetch(job.id, fetcher, source, dir, FetchQuality.OTHER_FORMAT, media.formatId)
-            store.update(job.id) { it.copy(state = JobState.ANALYSING, progress = null) }
-            frames = sampler.sample(media.video, File(dir, "frames-retry"))
-        }
-        val audio = media.audio ?: frames.audio
-        store.update(job.id) { it.copy(sampledAt = clock(), frameCount = frames.frames.size, hasAudio = audio != null) }
-        if (frames.frames.isEmpty()) throw AnalyzerException(FailureReason.VIDEO_UNREADABLE, message = "no frame could be decoded")
-        if (!budget.canSpend()) throw lastError ?: AnalyzerException(FailureReason.UNKNOWN, message = "call budget used up")
-        val input = AnalysisInput.FramesAndAudio(frames.frames, audio)
-        return when (val r = attempt(budget, timeouts.pathB) { analyzer.analyze(input, lang, job.userContext) }) {
-            is Attempt.Ok -> SavedAnalysis(r.analysis.result, r.analysis.model, "B")
-            is Attempt.Failed -> throw r.error
-        }
-    }
-
-    private suspend fun fetch(id: String, f: MediaFetcher, source: String, dir: File, q: FetchQuality, avoid: String?): FetchedMedia {
-        store.update(id) { it.copy(state = JobState.DOWNLOADING, progress = 0f) }
-        var reported = 0f
-        return f.fetch(source, dir, q, avoid) { p -> if (p - reported >= 0.05f || p >= 1f) reported = p }
-            .also { m -> store.update(id) { it.copy(progress = reported, downloadedAt = clock(), downloadBytes = m.video.length() + (m.audio?.length() ?: 0)) } }
-    }
-
-    private sealed interface Attempt {
-        data class Ok(val analysis: Analysis) : Attempt
-        data class Failed(val error: AnalyzerException) : Attempt
-    }
-
-    /** One analysis call. Quota/sign-in/busy failures end the job (another path would hit the same wall). */
-    private suspend fun attempt(budget: CallBudget, timeout: Duration, call: suspend () -> Analysis): Attempt {
-        budget.spend()
-        val result = try {
-            withTimeoutOrNull(timeout) { call() }
-        } catch (e: AnalyzerException) {
-            if (e.reason in TERMINAL) throw e
-            return Attempt.Failed(e)
-        }
-        return result?.let { Attempt.Ok(it) } ?: Attempt.Failed(AnalyzerException(FailureReason.NETWORK, message = "analysis timed out"))
     }
 
     private suspend fun fail(id: String, reason: FailureReason, detail: String?, retryAt: Long?) {
         store.update(id) { it.copy(state = JobState.FAILED, failure = reason, failureDetail = detail, retryAtEpochMs = retryAt, progress = null) }
-    }
-
-    /** Only Recon's own copies under [sharedRoot] are deleted (never an arbitrary path). */
-    private fun deleteSharedCopy(localUri: String?) {
-        val path = localUri?.removePrefix("file://") ?: return
-        if (localUri.startsWith("content://")) return
-        val f = File(path).canonicalFile
-        val root = sharedRoot.canonicalPath
-        if (!f.path.startsWith(root + File.separator)) return
-        f.delete()
-        f.parentFile?.takeIf { it.path != root && it.listFiles().isNullOrEmpty() }?.delete() // shared/<uuid>/
-    }
-
-    private fun mime(f: File) = when (f.extension.lowercase()) {
-        "webm" -> "video/webm"
-        "mov" -> "video/quicktime"
-        "3gp" -> "video/3gpp"
-        "mkv" -> "video/x-matroska"
-        else -> "video/mp4"
-    }
-
-    private class CallBudget(private val max: Int) {
-        private var used = 0
-        val remaining get() = max - used
-        fun canSpend() = used < max
-        fun spend() { check(canSpend()) { "call budget exceeded" }; used++ }
-    }
-
-    private companion object {
-        const val MAX_CALLS = 2
-        val TERMINAL = setOf(
-            FailureReason.QUOTA_EXCEEDED, FailureReason.API_KEY_MISSING, FailureReason.API_KEY_INVALID,
-            FailureReason.MODEL_BUSY,
-        )
     }
 }

@@ -12,7 +12,6 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.NavDestination.Companion.hasRoute
 import androidx.navigation.toRoute
-import dev.wolzard.recon.feature.context.ContextRoute
 import dev.wolzard.recon.feature.home.HomeRoute
 import dev.wolzard.recon.feature.job.JobIntent
 import dev.wolzard.recon.feature.job.JobRoute
@@ -30,7 +29,6 @@ import org.koin.core.parameter.parametersOf
 @Serializable object SignInDestination
 @Serializable object NoticeDestination
 @Serializable data class JobDestination(val id: String)
-@Serializable data class ContextDestination(val link: String)
 
 private const val SIGNED_IN_AGAIN = "signedInAgain"
 
@@ -43,7 +41,7 @@ fun startDestination(noticeNeeded: Boolean, signedIn: Boolean): Any = when {
 
 /**
  * The app's navigation graph. Screens are wired by their feature's Route; this only decides where each one leads.
- * [pendingJob] is a job to open (from a share or a notification); [pendingLink] a valid link to add context to (D23); [onNoticeAccepted] records the acceptance.
+ * [pendingJob] is a job to open (from a share or a notification); [pendingLink] is null; [onNoticeAccepted] records the acceptance.
  */
 @Composable
 fun ReconNavHost(
@@ -60,14 +58,10 @@ fun ReconNavHost(
     LaunchedEffect(pending) {
         pending?.let { nav.navigate(JobDestination(it)) { launchSingleTop = true }; pendingJob.value = null }
     }
-    val link by pendingLink.collectAsStateWithLifecycle()
-    LaunchedEffect(link) {
-        link?.let { nav.navigate(ContextDestination(it)); pendingLink.value = null }
-    }
     Scaffold { padding ->
         NavHost(nav, startDestination = start, modifier = Modifier.padding(padding)) {
             composable<HomeDestination> {
-                HomeRoute(koinViewModel(), onOpenJob = { nav.navigate(JobDestination(it)) }, onOpenSettings = { nav.navigate(SettingsDestination) }, onAddContext = { nav.navigate(ContextDestination(it)) })
+                HomeRoute(koinViewModel(), onOpenJob = { nav.navigate(JobDestination(it)) }, onOpenSettings = { nav.navigate(SettingsDestination) }, onAddContext = { nav.navigate(JobDestination(it)) })
             }
             composable<JobDestination> { entry ->
                 val id = entry.toRoute<JobDestination>().id
@@ -81,14 +75,6 @@ fun ReconNavHost(
                     onBack = { nav.popBackStack() },
                     onSignIn = { nav.navigate(SignInDestination) },
                     onSettings = { nav.navigate(SettingsDestination) },
-                )
-            }
-            composable<ContextDestination> { entry ->
-                val link = entry.toRoute<ContextDestination>().link
-                ContextRoute(
-                    koinViewModel(key = link) { parametersOf(link) },
-                    onOpenJob = { id -> nav.navigate(JobDestination(id)) { popUpTo<ContextDestination> { inclusive = true } } },
-                    onBack = { nav.popBackStack() },
                 )
             }
             composable<NoticeDestination> {

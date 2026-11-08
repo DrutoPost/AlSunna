@@ -1,0 +1,62 @@
+name: Build and Release APK
+
+on:
+  push:
+    branches:
+      - main
+      - master
+
+permissions:
+  contents: write
+
+jobs:
+  build-and-release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v3
+
+      - name: Create keystore.properties
+        run: |
+          cat << 'EOF' > keystore.properties
+          storeFile=drutopost-demo.jks
+          storePassword=drutopost123
+          keyAlias=drutopost
+          keyPassword=drutopost123
+          EOF
+
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+
+      - name: Build Release APK
+        run: ./gradlew assembleRelease
+
+      - name: Collect Release APK
+        run: |
+          mkdir -p release-artifacts
+          find app/build/outputs/apk/release/ -name "*.apk" -exec cp {} release-artifacts/release.apk \; || true
+          if [ ! -f release-artifacts/release.apk ]; then
+            # Universal / first apk fallback
+            find app/build/outputs/apk/ -name "*.apk" | head -n 1 | xargs -I {} cp {} release-artifacts/release.apk
+          fi
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: release-${{ github.sha }}
+          name: Release ${{ github.sha }}
+          draft: false
+          prerelease: false
+          files: release-artifacts/release.apk
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

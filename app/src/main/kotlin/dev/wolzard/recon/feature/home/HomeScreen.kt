@@ -143,7 +143,7 @@ private fun LinkField(error: String?, onIntent: (HomeIntent) -> Unit) {
     Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp)) {
         OutlinedTextField(
             value = text, onValueChange = { text = it }, singleLine = true, isError = error != null,
-            placeholder = { Text("Paste a video link", style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp)) },
+            placeholder = { Text("Paste an alsunna.net link", style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp)) },
             leadingIcon = { Icon(Symbols.Link, contentDescription = null, Modifier.size(20.dp), tint = muted) },
             trailingIcon = {
                 IconButton(onClick = { text = clipboardText(ctx) }) { Icon(Symbols.ContentPaste, contentDescription = "Paste from clipboard", Modifier.size(22.dp)) }
@@ -161,9 +161,9 @@ private fun LinkField(error: String?, onIntent: (HomeIntent) -> Unit) {
         error?.let { Text(it, Modifier.padding(top = 6.dp), color = MaterialTheme.colorScheme.error, style = MaterialTheme.typography.bodySmall) }
         Spacer(Modifier.height(8.dp))
         Button(onClick = { onIntent(HomeIntent.PasteLink(text)) }, Modifier.fillMaxWidth().height(48.dp), shape = MaterialTheme.shapes.small) {
-            Text("Start recon", style = MaterialTheme.typography.labelLarge)
+            Text("Translate hadith", style = MaterialTheme.typography.labelLarge)
         }
-        Text("Or share a link to Recon from any app.", Modifier.padding(top = 12.dp), color = muted, style = MaterialTheme.typography.bodySmall)
+        Text("Or share an alsunna.net link to the app.", Modifier.padding(top = 12.dp), color = muted, style = MaterialTheme.typography.bodySmall)
     }
 }
 
