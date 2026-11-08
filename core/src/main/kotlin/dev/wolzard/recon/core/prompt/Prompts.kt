@@ -11,6 +11,10 @@ object Prompts {
     const val CONTEXT_OPEN = "<<<VIEWER_TEXT"
     const val CONTEXT_CLOSE = "VIEWER_TEXT>>>"
 
+    /** Formats the prompt for translating the hadith commentary from an alsunna.net URL. */
+    fun hadithTranslation(url: String): String =
+        "“$url এর হাদীসটির সকল ব্যাখ্যার বাংলা অনুবাদ করে দাও। বিশেষ করে إخفاء شرح الحديث অংশে কোনো কাটছাট না করে, সম্পূর্ণ অনুবাদ দাও। প্রতিটি বর্ণনার সাথে তার উৎস যুক্ত করে দিও।”"
+
     /**
      * The analyse prompt. [userContext] (D23) goes in the same call as one delimited block labelled untrusted;
      * without it the prompt is unchanged apart from "no answer".

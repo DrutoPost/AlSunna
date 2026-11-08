@@ -103,25 +103,25 @@ class JobWorkerTest {
         assertEquals(60_000L, info.initialDelayMillis)
     }
 
-    @Test fun textShareWithoutLinkCreatesFailingJobAndEnqueuesWork() = runBlocking {
-        val intake = ShareIntake(ctx, store, ContentUriFetcher(ctx))
-        val id = (intake.accept(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, "no link in here")) as ShareOutcome.Started).jobId
-        assertEquals("no link in here", store.get(id)!!.sharedText)
+    @Test fun textShareWithValidAlsunnaLinkCreatesJobAndEnqueuesWork() = runBlocking {
+        val intake = ShareIntake(ctx, store)
+        val out = intake.accept(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, "look https://alsunna.net/hadith/772!"))
+        assertTrue(out is ShareOutcome.Started)
+        val id = (out as ShareOutcome.Started).jobId
+        assertEquals("https://alsunna.net/hadith/772", store.get(id)!!.sharedText)
         val infos = WorkManager.getInstance(ctx).getWorkInfosForUniqueWork(JobQueue.NAME).get()
         assertEquals(1, infos.size)
         assertTrue(infos.single().tags.contains(JobQueue.tag(id)))
     }
 
-    @Test fun textShareWithValidLinkWaitsForContextAndCreatesNothing() = runBlocking {
-        val intake = ShareIntake(ctx, store, ContentUriFetcher(ctx))
+    @Test fun textShareWithInvalidLinkIsIgnored() = runBlocking {
+        val intake = ShareIntake(ctx, store)
         val out = intake.accept(Intent(Intent.ACTION_SEND).setType("text/plain").putExtra(Intent.EXTRA_TEXT, "look https://youtu.be/abc!"))
-        assertEquals(ShareOutcome.NeedsContext("https://youtu.be/abc"), out)
-        assertTrue(store.observeAll().first().isEmpty())
-        assertTrue(WorkManager.getInstance(ctx).getWorkInfosForUniqueWork(JobQueue.NAME).get().isEmpty())
+        assertEquals(null, out)
     }
 
     @Test fun nonShareIntentIsIgnored() = runBlocking {
-        assertEquals(null, ShareIntake(ctx, store, ContentUriFetcher(ctx)).accept(Intent(Intent.ACTION_MAIN)))
+        assertEquals(null, ShareIntake(ctx, store).accept(Intent(Intent.ACTION_MAIN)))
     }
 
     @Test @Config(qualifiers = "hi") fun languageIsTheDeviceLocale() {

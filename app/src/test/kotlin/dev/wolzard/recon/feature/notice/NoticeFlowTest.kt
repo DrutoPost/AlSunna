@@ -50,7 +50,7 @@ class NoticeFlowTest {
         WorkManagerTestInitHelper.initializeTestWorkManager(ctx)
         db = Room.inMemoryDatabaseBuilder(ctx, ReconDb::class.java).allowMainThreadQueries().build()
         store = RoomJobStore(db)
-        intake = ShareIntake(ctx, store, ContentUriFetcher(ctx))
+        intake = ShareIntake(ctx, store)
     }
     @After fun close() = db.close()
 
@@ -95,31 +95,19 @@ class NoticeFlowTest {
 
     @Test fun shareBeforeAcceptCreatesNoJobUntilAccept() = runBlocking {
         val gate = ShareGate(Notice(prefs), intake::accept)
-        assertNull(gate.share(share("look https://www.instagram.com/reel/abc/")))
+        assertNull(gate.share(share("look https://alsunna.net/hadith/772")))
         assertTrue(jobs().isEmpty())
 
-        // Released through the intake: the link is validated now and waits for its context; still no job.
-        assertEquals(ShareOutcome.NeedsContext("https://www.instagram.com/reel/abc/"), gate.accepted())
+        val outcome = gate.accepted()
+        assertTrue(outcome is ShareOutcome.Started)
         assertNull(gate.accepted()) // released once
-        assertTrue(jobs().isEmpty())
+        assertEquals(1, jobs().size)
     }
 
     @Test fun afterAcceptSharesGoStraightThrough() = runBlocking {
         Notice(prefs).accept()
         val gate = ShareGate(Notice(prefs), intake::accept)
-        assertEquals(ShareOutcome.NeedsContext("https://youtu.be/a"), gate.share(share("https://youtu.be/a")))
-    }
-
-    @Test fun heldShareIsValidatedOnlyWhenReleased() = runBlocking {
-        val gate = ShareGate(Notice(prefs), intake::accept)
-        gate.share(share("javascript:alert(1) file:///data/data/dev.wolzard.recon/databases/recon.db intent://x#Intent;end"))
-        val id = (gate.accepted() as ShareOutcome.Started).jobId
-        // Released through the same intake as any share: no web link survives, so RunJob fails it as UNSUPPORTED_LINK.
-        val job = store.get(id)!!
-        assertNull(job.url)
-        assertNull(LinkRouter.extractUrl(job.sharedText))
-        // A non-share intent held before accept is dropped by the intake.
-        gate.share(Intent(Intent.ACTION_VIEW))
-        assertNull(gate.accepted())
+        val outcome = gate.share(share("https://alsunna.net/hadith/772"))
+        assertTrue(outcome is ShareOutcome.Started)
     }
 }

@@ -105,6 +105,8 @@ import dev.wolzard.recon.designsystem.dotGrid
 import dev.wolzard.recon.designsystem.status
 
 /** Stateless: everything comes from [job]/[result]; [now] drives the step clock and whether Retry is enabled yet. */
+import dev.wolzard.recon.designsystem.MarkdownView
+
 @Composable
 fun JobScreen(
     job: Job,
@@ -122,10 +124,6 @@ fun JobScreen(
             Modifier.weight(1f).verticalScroll(rememberScrollState()).padding(start = 16.dp, end = 16.dp, top = 4.dp, bottom = 24.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp),
         ) {
-            val url = job.url
-            if (done && url != null && LinkRouter.isWebUrl(url)) {
-                SaveVideoSection(job, isProbingFormats, saveOptions, saveError, onIntent)
-            }
             when {
                 job.state == JobState.FAILED -> Failed(job)
                 done -> Done(job, result!!, onIntent)
@@ -137,11 +135,11 @@ fun JobScreen(
             job.state == JobState.FAILED -> FailedActions(job, now, onIntent)
             done -> Unit
             job.state == JobState.WAITING_QUOTA -> BottomBar {
-                OutlinedButton(onClick = { onIntent(JobIntent.Cancel) }, Modifier.weight(1f).height(48.dp), shape = MaterialTheme.shapes.small) { Text("Cancel job") }
+                OutlinedButton(onClick = { onIntent(JobIntent.Cancel) }, Modifier.weight(1f).height(48.dp), shape = MaterialTheme.shapes.small) { Text("Cancel") }
                 Button(onClick = { onIntent(JobIntent.SignIn) }, Modifier.weight(1f).height(48.dp), shape = MaterialTheme.shapes.small) { Text("Switch account") }
             }
             else -> BottomBar {
-                OutlinedButton(onClick = { onIntent(JobIntent.Cancel) }, Modifier.weight(1f).height(48.dp), shape = MaterialTheme.shapes.small) { Text("Cancel job") }
+                OutlinedButton(onClick = { onIntent(JobIntent.Cancel) }, Modifier.weight(1f).height(48.dp), shape = MaterialTheme.shapes.small) { Text("Cancel") }
             }
         }
     }
@@ -525,52 +523,22 @@ private data class Step(val title: String, val detail: String?, val doneAt: Long
 @Composable
 private fun Running(job: Job, now: Long) {
     Target(job)
-    job.userContext?.let { YourQuestion(it, large = false) }
-    val steps = listOf(
-        Step("Downloading", listOfNotNull(job.downloadBytes?.let(JobCopy::megabytes), LinkPreview.formatDuration(job.videoDurationSec)?.let { "$it video" }).joinToString(" · ").ifEmpty { null }, job.downloadedAt),
-        Step("Sampling frames", listOfNotNull(job.frameCount?.let { "$it frames" }, "audio track".takeIf { job.hasAudio == true }).joinToString(" · ").ifEmpty { null }, job.sampledAt),
-        Step("Analysing", "Reading frames and audio", job.analysedAt),
-        Step("Researching", "Checking names against sources", null),
-    )
-    val current = when (job.state) {
-        JobState.DOWNLOADING -> 0
-        JobState.ANALYSING -> if (job.sampledAt == null) 1 else 2
-        JobState.RESEARCHING -> 3
-        else -> -1 // queued: nothing has started
-    }
     val line = MaterialTheme.colorScheme.outlineVariant
-    Column(Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium).background(MaterialTheme.colorScheme.surfaceContainer).border(1.dp, line, MaterialTheme.shapes.medium)) {
-        steps.forEachIndexed { i, s ->
-            if (i > 0) HorizontalDivider(color = line)
-            val active = i == current
-            val muted = MaterialTheme.colorScheme.onSurfaceVariant
-            Row(
-                Modifier.fillMaxWidth().then(if (active) Modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh) else Modifier).padding(horizontal = 16.dp, vertical = 12.dp),
-                horizontalArrangement = Arrangement.spacedBy(12.dp),
-            ) {
-                val (icon, label) = when {
-                    i < current -> Symbols.Check to "Done"
-                    active -> JobIcons.RadioButtonChecked to "In progress"
-                    else -> JobIcons.RadioButtonUnchecked to "Not started"
-                }
-                Icon(icon, label, Modifier.padding(top = 1.dp).size(20.dp), tint = if (i > current) muted else MaterialTheme.colorScheme.onSurface)
-                Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(s.title, color = if (i > current) muted else MaterialTheme.colorScheme.onSurface, style = MaterialTheme.typography.bodyLarge)
-                    if (s.detail != null && (i <= current || i >= 2)) Text(s.detail, color = muted, style = MaterialTheme.typography.bodySmall)
-                    // ponytail: the design's 1.6 s sweep is the stock indeterminate bar
-                    if (active) {
-                        val p = job.progress?.takeIf { job.state == JobState.DOWNLOADING }
-                        val mod = Modifier.padding(top = 8.dp).fillMaxWidth(0.85f).height(2.dp)
-                        if (p != null) LinearProgressIndicator(progress = { p }, modifier = mod, color = MaterialTheme.colorScheme.onSurface, trackColor = line, gapSize = 0.dp, drawStopIndicator = {})
-                        else LinearProgressIndicator(mod, color = MaterialTheme.colorScheme.onSurface, trackColor = line, gapSize = 0.dp)
-                    }
-                }
-                val time = when {
-                    i < current -> JobCopy.elapsed(job.startedAt, s.doneAt)
-                    active -> JobCopy.elapsed(job.startedAt, now)
-                    else -> null
-                }
-                time?.let { Text(it, color = if (active) MaterialTheme.colorScheme.onSurface else muted, style = MaterialTheme.typography.bodySmall) }
+    Column(
+        Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium)
+            .background(MaterialTheme.colorScheme.surfaceContainer)
+            .border(1.dp, line, MaterialTheme.shapes.medium)
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            CircularProgressIndicator(Modifier.size(24.dp), strokeWidth = 2.dp)
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text("Translating hadith explanation...", style = MaterialTheme.typography.titleSmall)
+                Text("Sending formatted prompt to Google Gemini", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
             }
         }
     }
@@ -624,32 +592,9 @@ private fun Waiting(job: Job, now: Long) {
 @Composable
 private fun Failed(job: Job) {
     val reason = job.failure ?: FailureReason.UNKNOWN
-    val noFrames = reason == FailureReason.VIDEO_UNREADABLE && job.frameCount == 0
-    StatusChip(if (noFrames) "Failed · 0 frames" else "Failed", ChipKind.Bad, icon = StatusIcons.Error)
-    Text(if (noFrames) JobCopy.NO_FRAMES_TITLE else JobCopy.failureMessage(reason, job.retryAtEpochMs, job.failureDetail), style = MaterialTheme.typography.titleLarge)
-    if (noFrames) Text(JobCopy.NO_FRAMES_BODY, style = MaterialTheme.typography.bodyLarge)
-    job.userContext?.let { YourQuestion(it, large = false) }
-    val bad = MaterialTheme.colorScheme.status.bad
-    val rows = listOfNotNull(
-        Triple("TARGET", job.originalLink()?.let(::compactLink) ?: job.displayHost(), null),
-        job.downloadBytes?.let { Triple("DOWNLOAD", "${JobCopy.megabytes(it)} · done", null) },
-        job.frameCount?.let { Triple("FRAMES", "$it", if (it == 0) bad else null) },
-        Triple("TIME", JobCopy.time(job.updatedAt), null),
-    )
-    Column(
-        Modifier.fillMaxWidth().clip(MaterialTheme.shapes.medium).background(MaterialTheme.colorScheme.surfaceContainer)
-            .border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.medium),
-    ) {
-        rows.forEachIndexed { i, (label, value, ink) ->
-            if (i > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 10.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-                SectionLabel(label)
-                Text(value, Modifier.weight(1f), color = ink ?: Color.Unspecified, textAlign = TextAlign.End, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodySmall)
-            }
-        }
-    }
-    if (noFrames && job.localUri == null) Text(JobCopy.NO_FRAMES_HINT, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
-    if (job.localUri != null && reason != FailureReason.UNSUPPORTED_LINK) Text("Share the video again to try once more; Recon's copy is gone.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium)
+    StatusChip("Failed", ChipKind.Bad, icon = StatusIcons.Error)
+    val msg = if (reason == FailureReason.UNSUPPORTED_LINK) "Only alsunna.net links are supported." else JobCopy.failureMessage(reason, job.retryAtEpochMs, job.failureDetail)
+    Text(msg, style = MaterialTheme.typography.titleLarge)
 }
 
 /** The failure table's actions (plan → State machine) in the design's bottom bar: one filled action, then text actions. */
@@ -803,100 +748,17 @@ private val SourceText = TextStyle(fontFamily = Mono, fontSize = 13.sp, lineHeig
 
 @Composable
 private fun Done(job: Job, result: JobResult, onIntent: (JobIntent) -> Unit) {
-    val asked = job.userContext != null
-    val answerSources = if (asked) result.analysis.answer?.sources.orEmpty() else emptyList()
-    if (asked) {
-        YourQuestion(job.userContext!!, large = true)
-        AnswerCard(result.analysis.answer, firstSourceNumber = result.sources.size + 1)
-        Spacer(Modifier.height(4.dp))
-    }
-    VideoHeader(job)
-    Spacer(Modifier.height(4.dp))
-    SectionLabel("SUMMARY")
-    Text(result.analysis.summary, style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp, lineHeight = 24.sp))
-    result.degraded.forEach { (id, retryAt) ->
-        val text = JobCopy.degradedBanner(id, retryAt) ?: return@forEach
-        OutlinedCard(border = BorderStroke(1.dp, MaterialTheme.colorScheme.status.unverified)) {
-            Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text(text, style = MaterialTheme.typography.bodyMedium)
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    when (id) {
-                        "budget" -> Button(shape = MaterialTheme.shapes.small, onClick = { onIntent(JobIntent.LookUp) }) { Text("Look up") }
-                        "github" -> {
-                            OutlinedButton(shape = MaterialTheme.shapes.small, onClick = { onIntent(JobIntent.OpenSettings) }) { Text("Add GitHub token") }
-                            Button(shape = MaterialTheme.shapes.small, onClick = { onIntent(JobIntent.CheckAgain) }) { Text("Check again") }
-                        }
-                        else -> Button(shape = MaterialTheme.shapes.small, onClick = { onIntent(JobIntent.CheckAgain) }) { Text("Check again") }
-                    }
-                }
+    val content = result.markdown ?: result.analysis.summary
+    CardBox {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Icon(Symbols.MenuBook, contentDescription = null, Modifier.size(18.dp), tint = MaterialTheme.colorScheme.primary)
+                Text("Hadith Explanation & Bengali Translation", style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold))
             }
+            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+            MarkdownView(text = content, modifier = Modifier.fillMaxWidth())
         }
     }
-    val indexed = result.findings.withIndex()
-    val entities = indexed.filter { it.value.entity.type != EntityType.CLAIM }
-    val claims = indexed.filter { it.value.entity.type == EntityType.CLAIM }
-    Spacer(Modifier.height(4.dp))
-    if (result.findings.isEmpty()) Box(
-        Modifier.fillMaxWidth().heightIn(min = 200.dp).border(1.dp, MaterialTheme.colorScheme.outlineVariant, MaterialTheme.shapes.medium)
-            .dotGrid(MaterialTheme.colorScheme.outlineVariant).padding(24.dp),
-        contentAlignment = Alignment.Center,
-    ) {
-        Column(Modifier.background(MaterialTheme.colorScheme.background), horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Icon(JobIcons.SearchOff, null, Modifier.size(28.dp), tint = MaterialTheme.colorScheme.onSurfaceVariant)
-            Text(JobCopy.NOTHING_FOUND, style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
-            Text(JobCopy.NOTHING_FOUND_DETAIL, color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium, textAlign = TextAlign.Center)
-        }
-    }
-    if (entities.isNotEmpty()) SectionLabel("ENTITIES FOUND · ${entities.size}")
-    entities.forEach { (i, f) -> FindingCard(i, f, onIntent) }
-    if (claims.isNotEmpty()) {
-        Spacer(Modifier.height(4.dp))
-        SectionLabel("CLAIMS · ${claims.size}")
-        CardBox {
-            claims.forEachIndexed { n, (_, f) ->
-                if (n > 0) HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-                ClaimRow(f, result)
-            }
-        }
-        if (claims.any { it.value.entity.domain?.sensitive == true }) Text(JobCopy.NOT_ADVICE, Modifier.testTag("advice_footer"), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
-    }
-
-    val sourceCount = result.sources.size + answerSources.size
-    if (sourceCount > 0) {
-        Spacer(Modifier.height(4.dp))
-        SectionLabel("SOURCES · $sourceCount")
-        Column {
-            result.sources.forEachIndexed { i, src ->
-                SourceLine(i + 1, src.title) { onIntent(JobIntent.Open(src.uri)) }
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            }
-            answerSources.forEachIndexed { k, src ->
-                SourceLine(result.sources.size + k + 1, src)
-                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
-            }
-        }
-    }
-    val sharperOffered = result.path != "youtube-url" && result.analysis.entities.all { it.evidence == Evidence.INFERRED }
-    if (sharperOffered) {
-        Spacer(Modifier.height(4.dp))
-        CardBox(Modifier.testTag("sharper_card")) {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Text("Text hard to read?", style = MaterialTheme.typography.labelLarge)
-                Text("Run again with more frames at higher resolution.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyMedium.copy(fontSize = 15.sp, lineHeight = 21.sp))
-                Spacer(Modifier.height(8.dp))
-                OutlinedButton(
-                    onClick = { onIntent(JobIntent.TrySharper) }, Modifier.fillMaxWidth().height(48.dp), shape = MaterialTheme.shapes.small,
-                    colors = ButtonDefaults.outlinedButtonColors(containerColor = MaterialTheme.colorScheme.background, contentColor = MaterialTheme.colorScheme.onSurface),
-                ) {
-                    Icon(Symbols.CenterFocusWeak, null, Modifier.size(18.dp)); Spacer(Modifier.width(8.dp)); Text("Try sharper video")
-                }
-            }
-        }
-    }
-    result.searchSuggestionsHtml?.let { SearchSuggestions(it) }
-    OnScreenText(result.analysis.onScreenText)
-    val models = listOfNotNull(result.models["analyse"]?.let { "Analysed by $it" }, result.models["research"]?.let { "researched by $it" })
-    if (models.isNotEmpty()) Text(models.joinToString(" · "), color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodySmall)
 }
 
 @Composable

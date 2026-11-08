@@ -1,14 +1,20 @@
 package dev.wolzard.recon.feature.home
 
 import androidx.lifecycle.viewModelScope
+import dev.wolzard.recon.core.job.UserAction
 import dev.wolzard.recon.core.link.LinkRouter
 import dev.wolzard.recon.core.port.JobStore
 import dev.wolzard.recon.data.update.UpdateChecker
+import dev.wolzard.recon.feature.job.JobActions
 import dev.wolzard.recon.mvi.MviViewModel
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.launch
 
-class HomeViewModel(store: JobStore, private val updates: UpdateChecker) : MviViewModel<HomeState, HomeIntent, HomeEffect>(HomeState()) {
+class HomeViewModel(
+    private val store: JobStore,
+    private val updates: UpdateChecker,
+    private val actions: JobActions? = null,
+) : MviViewModel<HomeState, HomeIntent, HomeEffect>(HomeState()) {
     init {
         viewModelScope.launch {
             combine(store.observeAll(), updates.available) { jobs, update -> jobs.map(HomeRow::from) to update }
@@ -16,7 +22,7 @@ class HomeViewModel(store: JobStore, private val updates: UpdateChecker) : MviVi
         }
     }
 
-    private companion object { const val NO_LINK = "That isn't a video link. Copy the link from the app's Share menu and paste it here." }
+    private companion object { const val NO_LINK = "Please enter a valid alsunna.net link (http or https, no subdomains)." }
 
     override fun onIntent(intent: HomeIntent) = when (intent) {
         is HomeIntent.OpenJob -> send(HomeEffect.NavigateToJob(intent.id))
@@ -26,7 +32,16 @@ class HomeViewModel(store: JobStore, private val updates: UpdateChecker) : MviVi
         is HomeIntent.PasteLink -> {
             val link = LinkRouter.validLink(intent.text)
             setState { copy(pasteError = if (link == null) NO_LINK else null) }
-            if (link != null) send(HomeEffect.NavigateToContext(link))
+            if (link != null) {
+                viewModelScope.launch {
+                    val jobId = if (actions != null) {
+                        actions.start(link, null, null)
+                    } else {
+                        store.create(link, null)
+                    }
+                    if (jobId != null) send(HomeEffect.NavigateToJob(jobId))
+                }
+            }
             Unit
         }
     }

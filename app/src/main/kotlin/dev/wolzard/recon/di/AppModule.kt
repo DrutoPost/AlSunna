@@ -10,6 +10,7 @@ import dev.wolzard.recon.core.port.LanguageModel
 import dev.wolzard.recon.core.port.LinkResolver
 import dev.wolzard.recon.core.port.SecretStore
 import dev.wolzard.recon.core.port.Secret
+import dev.wolzard.recon.core.port.PromptGenerator
 import dev.wolzard.recon.core.port.VideoAnalyzer
 import dev.wolzard.recon.data.db.MIGRATION_1_2
 import dev.wolzard.recon.data.db.MIGRATION_2_3
@@ -71,7 +72,7 @@ val appModule = module {
     single<LinkResolver> { OkHttpLinkResolver(get()) }
     single { UrlNormalizer(get()) }
     single<SecretStore> { KeystoreSecretStore(androidContext()) }
-    single { GeminiWebClient(get(), get()) }
+    single { GeminiWebClient(get(), get()) } binds arrayOf(PromptGenerator::class)
     single { GeminiWebBackend(get()) } binds arrayOf(VideoAnalyzer::class, LanguageModel::class)
     single<YtDlpRunner> { YoutubeDlRunner(androidContext()) }
     single { YtDlpFetcher(get()) }
@@ -93,10 +94,11 @@ val appModule = module {
             workRoot = androidContext().cacheDir,
             sharedRoot = File(androidContext().filesDir, ContentUriFetcher.SHARED_DIR),
             clock = get(),
+            webClient = get(),
         )
     }
     single<JobRunner> { val runJob: RunJob = get(); JobRunner { id, action -> runJob(id, action) } }
-    single { ShareIntake(androidContext(), get(), get()) }
+    single { ShareIntake(androidContext(), get()) }
     viewModel {
         val secrets: SecretStore = get()
         // The address goes next to the cookies only after the check passed; sign-out clears both (GeminiSession).
@@ -126,5 +128,5 @@ val appModule = module {
     single { ThumbnailLoader(get()) }
     viewModel { dev.wolzard.recon.ShareSheetViewModel(get()) }
     viewModel { params -> ContextViewModel(params.get(), get(), get(), get(), params.values.getOrNull(1) as? String, get<LinkPreviewFetcher>()::fetch) }
-    viewModel { HomeViewModel(get(), get()) }
+    viewModel { HomeViewModel(get(), get(), get()) }
 }

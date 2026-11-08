@@ -35,13 +35,15 @@ import kotlin.random.Random
  * Google can change it at any time. Cookies are kept as one Cookie header string in [Secret.GEMINI_COOKIES]
  * and are never logged. Chats are temporary, so jobs don't appear in the user's Gemini history.
  */
+import dev.wolzard.recon.core.port.PromptGenerator
+
 class GeminiWebClient(
     client: OkHttpClient,
     private val secrets: SecretStore,
     private val appUrl: String = "https://gemini.google.com",
     private val uploadUrl: String = "https://content-push.googleapis.com/upload",
     private val rotateUrl: String = "https://accounts.google.com/RotateCookies",
-) {
+) : PromptGenerator {
     private data class Session(val at: String, val bl: String?, val sid: String?, val hl: String, val pushId: String)
 
     // Generation can take ~2 min under load; RunJob's own timeouts cancel the call earlier if needed.
@@ -73,7 +75,9 @@ class GeminiWebClient(
     }
 
     /** One prompt, with files from [upload] as (id, file name). Returns the reply text. */
-    suspend fun generate(prompt: String, files: List<Pair<String, String>> = emptyList()): String {
+    override suspend fun generate(prompt: String): String = generate(prompt, emptyList())
+
+    suspend fun generate(prompt: String, files: List<Pair<String, String>>): String {
         val r = postGenerate(session(), prompt, files).takeIf { it.code == 200 }
             ?: run { session = null; postGenerate(session(), prompt, files) } // stale token: re-init once
         if (r.code != 200) throw AnalyzerException(FailureReason.UNKNOWN, message = "generate HTTP ${r.code}")
