@@ -15,16 +15,14 @@ class Notice(private val prefs: SharedPreferences, private val version: Int = NO
         const val PREFS = "notice"
         /** Bold lead and the rest of each notice row, in the design's order; the download/terms row is Recon's own (kept from v4). */
         val TEXT = listOf(
-            "Video goes to Google Gemini." to "Frames and audio are sent through your own signed-in Google account.",
-            "You're responsible for what you share." to "Recon downloads a temporary copy, deleted after analysis, and asks the " +
-                "platform for the title, length and thumbnail. Instagram, TikTok, X and others may forbid downloading in their terms.",
-            "Unofficial." to "Not made by Google. Access can stop working or be blocked at any time.",
-            "Use a secondary Google account." to "Automated use may put the signed-in account at risk.",
-            "Results can be wrong." to "Check the sources before you act on anything.",
-            "Not professional advice." to "Health, legal and financial output is information only.",
-            "Downloads can update their own code." to "If a link download fails, Recon fetches the newest yt-dlp from GitHub over HTTPS and runs it on your phone, at most once a day. " +
-                "That code isn't reviewed by Recon or by F-Droid.",
-            "Outside the Play Store." to "Install updates only from the official GitHub releases.",
+            "Hadith links are sent to Google Gemini." to "AlSunnah sends alsunna.net links to Google Gemini for translation and commentary.",
+            "Authentic commentary and translation." to "Commentary from classical scholars is translated into Bengali with full references.",
+            "Unofficial." to "AlSunnah uses Gemini web with your signed-in Google account.",
+            "Use a secondary Google account." to "Automated requests may put the signed-in account at risk. Use an account you can afford to lose.",
+            "Verify with classical texts." to "Always verify translations and sources against original Islamic scholarly texts.",
+            "Dynamic multilingual typography." to "Bengali text is rendered with Bornomala font, Arabic text with Scheherazade font.",
+            "Privacy on device." to "Session credentials stay securely encrypted on your phone. No tracking or telemetry.",
+            "Outside the Play Store." to "Install updates only from official releases.",
         )
     }
 }

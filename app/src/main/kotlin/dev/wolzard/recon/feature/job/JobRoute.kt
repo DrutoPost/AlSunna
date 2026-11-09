@@ -29,9 +29,6 @@ fun JobRoute(vm: JobViewModel, clock: () -> Long, onBack: () -> Unit, onSignIn: 
             job = it,
             result = state.result,
             now = now,
-            isProbingFormats = state.isProbingFormats,
-            saveOptions = state.saveOptions,
-            saveError = state.saveError,
             onIntent = vm::onIntent,
         )
     }

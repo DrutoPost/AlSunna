@@ -80,7 +80,7 @@ fun Wordmark(modifier: Modifier = Modifier) {
     Row(modifier, verticalAlignment = Alignment.CenterVertically) {
         Reticle(Modifier.size(20.dp))
         Spacer(Modifier.width(10.dp))
-        Text("Recon", style = MaterialTheme.typography.titleMedium.copy(fontFamily = Mono, fontWeight = FontWeight.Medium, fontSize = 19.sp, lineHeight = 24.sp))
+        Text("AlSunnah", style = MaterialTheme.typography.titleMedium.copy(fontFamily = Mono, fontWeight = FontWeight.Medium, fontSize = 19.sp, lineHeight = 24.sp))
     }
 }
 

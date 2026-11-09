@@ -191,9 +191,9 @@ fun HomeScreen(state: HomeState, onIntent: (HomeIntent) -> Unit) {
                 Column(Modifier.background(MaterialTheme.colorScheme.background), horizontalAlignment = Alignment.CenterHorizontally) {
                     Reticle(Modifier.size(48.dp), tick = MaterialTheme.colorScheme.onSurfaceVariant, dot = MaterialTheme.colorScheme.onSurfaceVariant)
                     Spacer(Modifier.height(10.dp))
-                    Text("No jobs yet", style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
+                    Text("No translations yet", style = MaterialTheme.typography.titleMedium, textAlign = TextAlign.Center)
                     Spacer(Modifier.height(8.dp))
-                    Text("Share a video from any app, or paste a link above.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center)
+                    Text("Paste an alsunna.net Hadith link above or share one from your browser.", color = MaterialTheme.colorScheme.onSurfaceVariant, style = MaterialTheme.typography.bodyLarge, textAlign = TextAlign.Center)
                 }
             }
             return

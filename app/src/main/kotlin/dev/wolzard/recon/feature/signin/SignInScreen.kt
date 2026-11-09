@@ -100,8 +100,11 @@ private fun Intro(state: SignInState, advanced: Boolean, onAdvanced: (Boolean) -
             Text("STEP 2 OF 2 · ACCOUNT", color = muted, style = MaterialTheme.typography.labelSmall)
             Spacer(Modifier.height(28.dp))
             Text("Sign in to Google", style = MaterialTheme.typography.titleLarge.copy(fontSize = 24.sp, lineHeight = 30.sp))
-            Spacer(Modifier.height(20.dp))
-            Text(SetupCopy.SIGN_IN_INTRO, style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp, lineHeight = 24.sp))
+            Spacer(Modifier.height(16.dp))
+            Text(
+                "AlSunnah connects directly to Google Gemini web to analyze and translate Hadith explanations. Sign in with your Google account to enable translations.",
+                style = MaterialTheme.typography.bodyLarge.copy(fontSize = 16.sp, lineHeight = 24.sp),
+            )
             Spacer(Modifier.height(20.dp))
             RiskCard()
             Status(state, Modifier.padding(top = 16.dp))

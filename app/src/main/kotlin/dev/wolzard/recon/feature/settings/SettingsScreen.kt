@@ -141,14 +141,6 @@ fun SettingsScreen(state: SettingsState, onIntent: (SettingsIntent) -> Unit) {
                 onClick = { if (!state.checkingUpdate) onIntent(SettingsIntent.CheckForUpdates) },
                 leading = { Icon(Symbols.Sync, contentDescription = null, tint = muted) },
             )
-            // F-Droid's inclusion policy: downloading code needs opt-in consent that says it skips F-Droid's checks.
-            SettingRow(
-                "Update yt-dlp",
-                "Downloads the newest yt-dlp from GitHub before your first download after installing Recon. " +
-                    "Even with this off, Recon updates it once (at most daily) and tries again when a download fails. " +
-                    "It's code that runs on your phone and skips F-Droid's checks.",
-                trailing = { Switch(checked = state.ytDlpAutoUpdate, onCheckedChange = { onIntent(SettingsIntent.SetYtDlpAutoUpdate(it)) }, Modifier.semantics { contentDescription = "Update yt-dlp" }) },
-            )
 
             Section("ABOUT")
             SettingRow("Version", trailing = { Text("${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})", color = muted, style = MaterialTheme.typography.bodySmall) })
@@ -162,14 +154,9 @@ fun SettingsScreen(state: SettingsState, onIntent: (SettingsIntent) -> Unit) {
             })
             SettingRow("Show first-run notice", onClick = { onIntent(SettingsIntent.OpenNotice) })
 
-            // Not in design 1l; kept in the same row style so nothing the app did before is lost.
-            Section("GITHUB")
-            GitHubToken(state.hasGitHubToken, onIntent)
-
             Section("PRIVACY")
             Text(
-                "Videos, or frames and audio, go to Gemini with your Google account, in temporary chats. Names of things found go to " +
-                    "GitHub and Wikipedia. Your history and sign-in stay on this phone. ${SetupCopy.DATA_NOTE}\n\n${SetupCopy.ACCOUNT_RISK}",
+                "Hadith translation requests are sent directly to Google Gemini in temporary chats. Session credentials and translation history stay securely on this phone. ${SetupCopy.DATA_NOTE}\n\n${SetupCopy.ACCOUNT_RISK}",
                 Modifier.padding(vertical = 12.dp), color = muted, style = MaterialTheme.typography.bodyMedium,
             )
         }

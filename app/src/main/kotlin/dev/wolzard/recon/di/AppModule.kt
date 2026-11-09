@@ -37,7 +37,6 @@ import dev.wolzard.recon.data.link.ThumbnailLoader
 import dev.wolzard.recon.data.media.AndroidFrameSampler
 import dev.wolzard.recon.data.media.ContentUriFetcher
 import dev.wolzard.recon.core.port.FrameSampler
-import dev.wolzard.recon.data.media.VideoFormatFetcher
 import dev.wolzard.recon.data.media.YoutubeDlRunner
 import dev.wolzard.recon.data.media.YtDlp
 import dev.wolzard.recon.data.media.YtDlpFetcher
@@ -122,8 +121,7 @@ val appModule = module {
             enqueue = { id, action -> JobQueue.enqueue(androidContext(), id, action) },
         )
     }
-    single { VideoFormatFetcher(get()) }
-    viewModel { params -> JobViewModel(params.get(), get(), get(), get()) }
+    viewModel { params -> JobViewModel(params.get(), get(), get()) }
     single { LinkPreviewFetcher({ url -> get<YtDlpRunner>().run(url, listOf("--dump-json", "--skip-download", "--no-playlist"), "preview-${java.util.UUID.randomUUID()}") {} }) }
     single { ThumbnailLoader(get()) }
     viewModel { dev.wolzard.recon.ShareSheetViewModel(get()) }
