@@ -12,8 +12,16 @@ object Prompts {
     const val CONTEXT_CLOSE = "VIEWER_TEXT>>>"
 
     /** Formats the prompt for translating the hadith commentary from an alsunna.net URL. */
-    fun hadithTranslation(url: String): String =
-        "“$url এর হাদীসটির সকল ব্যাখ্যার বাংলা অনুবাদ করে দাও। বিশেষ করে إخفاء شرح الحديث অংশে কোনো কাটছাট না করে, সম্পূর্ণ অনুবাদ দাও। প্রতিটি বর্ণনার সাথে তার উৎস যুক্ত করে দিও।”"
+    fun hadithTranslation(url: String): String = """
+$url এর হাদীসটির সকল ব্যাখ্যার সম্পূর্ণ বাংলা অনুবাদ প্রদান করো।
+
+নির্দেশনাবলী:
+1. কেবল যা চাওয়া হয়েছে ঠিক তাই অনুবাদ করো। কোনো ভূমিকা, প্রারম্ভিক ভূমিকা, উপসংহার বা ভবিষ্যৎ কোনো প্রশ্ন/জিজ্ঞাসা করবে না।
+2. إخفاء شرح الحديث অংশের কোনো কাটছাঁট না করে সম্পূর্ণ ও নির্ভুল অনুবাদ প্রদান করবে।
+3. কঠোরভাবে সঠিক Markdown ফরম্যাট অনুসরণ করো:
+   - প্রতিটি বক্তব্য বা ব্যাখ্যা (উদ্ধৃতি) স্বতন্ত্র ব্লককোট (> ...) হিসেবে উপস্থাপন করবে।
+   - প্রতিটি উদ্ধৃতির সাথে তার নির্ভরযোগ্য তথ্যসূত্র ও উৎস (reference) স্পষ্টভাবে উল্লেখ করবে।
+""".trimIndent()
 
     /**
      * The analyse prompt. [userContext] (D23) goes in the same call as one delimited block labelled untrusted;

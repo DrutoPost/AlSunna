@@ -182,7 +182,84 @@ private fun CodeBlock(code: String) {
     }
 }
 
-/** Parses bold, italic, inline code, and links into an AnnotatedString. */
+private enum class ScriptType {
+    BENGALI,
+    ARABIC,
+    OTHER
+}
+
+private fun charScript(c: Char): ScriptType = when (c.code) {
+    in 0x0980..0x09FF -> ScriptType.BENGALI
+    in 0x0600..0x06FF, in 0x0750..0x077F, in 0x08A0..0x08FF, in 0xFB50..0xFDFF, in 0xFE70..0xFEFF -> ScriptType.ARABIC
+    else -> ScriptType.OTHER
+}
+
+/**
+ * Appends [text] to this [AnnotatedString.Builder], splitting into dynamic font spans
+ * so Bengali text uses Bornomala, Arabic text uses Scheherazade, and other characters
+ * inherit the default typeface. Punctuation/whitespace merges with preceding/following script.
+ */
+fun AnnotatedString.Builder.appendWithDynamicScriptFonts(text: String, baseStyle: SpanStyle? = null) {
+    if (text.isEmpty()) return
+
+    var i = 0
+    while (i < text.length) {
+        val c = text[i]
+        val script = charScript(c)
+
+        if (script == ScriptType.OTHER) {
+            val start = i
+            while (i < text.length && charScript(text[i]) == ScriptType.OTHER) {
+                i++
+            }
+            val chunk = text.substring(start, i)
+            if (baseStyle != null) {
+                withStyle(baseStyle) { append(chunk) }
+            } else {
+                append(chunk)
+            }
+        } else {
+            val start = i
+            val currentScript = script
+            while (i < text.length) {
+                val sc = charScript(text[i])
+                if (sc == currentScript || (sc == ScriptType.OTHER && (text[i].isWhitespace() || text[i] in "।.,;:!?-\"'()[]{}«»/\\"))) {
+                    if (sc == ScriptType.OTHER && !text[i].isWhitespace()) {
+                        var peek = i + 1
+                        while (peek < text.length && (text[peek].isWhitespace() || text[peek] in "।.,;:!?-\"'()[]{}«»/\\")) peek++
+                        if (peek < text.length && charScript(text[peek]) == currentScript) {
+                            i++
+                            continue
+                        } else {
+                            break
+                        }
+                    }
+                    i++
+                } else {
+                    break
+                }
+            }
+            val chunk = text.substring(start, i)
+            val font = when (currentScript) {
+                ScriptType.BENGALI -> Bornomala
+                ScriptType.ARABIC -> Scheherazade
+                ScriptType.OTHER -> null
+            }
+            val combinedStyle = when {
+                baseStyle != null && font != null -> baseStyle.copy(fontFamily = font)
+                font != null -> SpanStyle(fontFamily = font)
+                else -> baseStyle
+            }
+            if (combinedStyle != null) {
+                withStyle(combinedStyle) { append(chunk) }
+            } else {
+                append(chunk)
+            }
+        }
+    }
+}
+
+/** Parses bold, italic, inline code, and links into an AnnotatedString with dynamic font support. */
 fun parseMarkdownInline(input: String): AnnotatedString {
     return buildAnnotatedString {
         var i = 0
@@ -192,12 +269,11 @@ fun parseMarkdownInline(input: String): AnnotatedString {
                 input.startsWith("**", i) -> {
                     val end = input.indexOf("**", i + 2)
                     if (end != -1) {
-                        withStyle(SpanStyle(fontWeight = FontWeight.Bold)) {
-                            append(input.substring(i + 2, end))
-                        }
+                        val content = input.substring(i + 2, end)
+                        appendWithDynamicScriptFonts(content, SpanStyle(fontWeight = FontWeight.Bold))
                         i = end + 2
                     } else {
-                        append(input[i])
+                        appendWithDynamicScriptFonts(input[i].toString())
                         i++
                     }
                 }
@@ -210,7 +286,7 @@ fun parseMarkdownInline(input: String): AnnotatedString {
                         }
                         i = end + 1
                     } else {
-                        append(input[i])
+                        appendWithDynamicScriptFonts(input[i].toString())
                         i++
                     }
                 }
@@ -219,12 +295,11 @@ fun parseMarkdownInline(input: String): AnnotatedString {
                     val mark = input[i]
                     val end = input.indexOf(mark, i + 1)
                     if (end != -1 && end > i + 1) {
-                        withStyle(SpanStyle(fontStyle = FontStyle.Italic)) {
-                            append(input.substring(i + 1, end))
-                        }
+                        val content = input.substring(i + 1, end)
+                        appendWithDynamicScriptFonts(content, SpanStyle(fontStyle = FontStyle.Italic))
                         i = end + 1
                     } else {
-                        append(input[i])
+                        appendWithDynamicScriptFonts(input[i].toString())
                         i++
                     }
                 }
@@ -235,22 +310,27 @@ fun parseMarkdownInline(input: String): AnnotatedString {
                         val urlEnd = input.indexOf(')', textEnd + 2)
                         if (urlEnd != -1) {
                             val linkText = input.substring(i + 1, textEnd)
-                            withStyle(SpanStyle(textDecoration = TextDecoration.Underline, color = androidx.compose.ui.graphics.Color(0xFF2684FF))) {
-                                append(linkText)
-                            }
+                            appendWithDynamicScriptFonts(
+                                linkText,
+                                SpanStyle(textDecoration = TextDecoration.Underline, color = androidx.compose.ui.graphics.Color(0xFF2684FF)),
+                            )
                             i = urlEnd + 1
                         } else {
-                            append(input[i])
+                            appendWithDynamicScriptFonts(input[i].toString())
                             i++
                         }
                     } else {
-                        append(input[i])
+                        appendWithDynamicScriptFonts(input[i].toString())
                         i++
                     }
                 }
                 else -> {
-                    append(input[i])
-                    i++
+                    val start = i
+                    while (i < input.length && !input.startsWith("**", i) && !input.startsWith("`", i) && input[i] != '*' && input[i] != '_' && input[i] != '[') {
+                        i++
+                    }
+                    val plain = input.substring(start, i)
+                    appendWithDynamicScriptFonts(plain)
                 }
             }
         }

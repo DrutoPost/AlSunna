@@ -47,7 +47,7 @@ fun NoticeScreen(onAccept: () -> Unit) {
             Spacer(Modifier.height(24.dp))
             Text("Before you start", style = MaterialTheme.typography.titleLarge.copy(fontSize = 24.sp, lineHeight = 30.sp))
             Spacer(Modifier.height(8.dp))
-            Text("Recon is a personal-use tool. Read this once.", color = muted, style = MaterialTheme.typography.bodyLarge)
+            Text("AlSunnah Hadith commentary translator. Read this once before getting started.", color = muted, style = MaterialTheme.typography.bodyLarge)
             Spacer(Modifier.height(20.dp))
             HorizontalDivider(color = line)
             Notice.TEXT.forEachIndexed { i, (lead, rest) ->

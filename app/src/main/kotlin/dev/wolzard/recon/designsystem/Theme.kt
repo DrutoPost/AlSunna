@@ -34,9 +34,11 @@ private val LightStatus = StatusColors(Color(0xFF3F6B12), Color(0xFF8A5A00), Col
 private val Lime = Color(0xFFA8E06C)
 private val Ink = Color(0xFF0E1110)
 
-// D24: Inter and JetBrains Mono (both SIL OFL, docs/licenses), subset to Latin, 369 KB in all. Other scripts fall back to the system font.
+// Fonts: Bornomala for Bengali, Scheherazade for Arabic, Inter and JetBrains Mono for Latin/Mono.
 val Mono = FontFamily(Font(R.font.jetbrains_mono_regular, FontWeight.Normal), Font(R.font.jetbrains_mono_medium, FontWeight.Medium))
-private val Sans = FontFamily(Font(R.font.inter_regular, FontWeight.Normal), Font(R.font.inter_medium, FontWeight.Medium), Font(R.font.inter_semibold, FontWeight.SemiBold))
+val Bornomala = FontFamily(Font(R.font.bornomala, FontWeight.Normal))
+val Scheherazade = FontFamily(Font(R.font.scheherazade, FontWeight.Normal))
+val Sans = FontFamily(Font(R.font.inter_regular, FontWeight.Normal), Font(R.font.inter_medium, FontWeight.Medium), Font(R.font.inter_semibold, FontWeight.SemiBold))
 
 private val Dark = darkColorScheme(
     background = Ink, surface = Ink, onBackground = Color(0xFFE8ECE9), onSurface = Color(0xFFE8ECE9),

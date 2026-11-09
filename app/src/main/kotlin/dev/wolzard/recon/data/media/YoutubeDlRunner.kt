@@ -2,7 +2,6 @@ package dev.wolzard.recon.data.media
 
 import android.content.Context
 import android.util.Log
-import com.yausername.ffmpeg.FFmpeg
 import com.yausername.youtubedl_android.YoutubeDL
 import com.yausername.youtubedl_android.YoutubeDLException
 import com.yausername.youtubedl_android.YoutubeDLRequest
@@ -27,8 +26,6 @@ import kotlinx.coroutines.withContext
 object YtDlp {
     private val lock = Mutex()
     @Volatile private var ready = false
-    @Volatile private var ffmpegReady = false
-    private val ffmpegInitLock = Any()
 
     suspend fun <T> use(context: Context, block: suspend () -> T): T = lock.withLock {
         if (!ready) {
@@ -39,24 +36,6 @@ object YtDlp {
             ready = true
         }
         block()
-    }
-
-    /** Initialises FFmpeg lazily on the save path (D28). Throws [YtDlpException] on init failure. */
-    suspend fun ensureFFmpeg(context: Context) {
-        if (!ffmpegReady) {
-            withContext(Dispatchers.IO) {
-                synchronized(ffmpegInitLock) {
-                    if (!ffmpegReady) {
-                        try {
-                            FFmpeg.getInstance().init(context.applicationContext)
-                            ffmpegReady = true
-                        } catch (e: Exception) {
-                            throw YtDlpException(e.message?.ifEmpty { null } ?: "FFmpeg initialization failed")
-                        }
-                    }
-                }
-            }
-        }
     }
 
     /** @return the update status, or null if it failed (the current version stays in use). */
@@ -94,11 +73,7 @@ class YoutubeDlRunner(private val context: Context) : YtDlpRunner {
     override suspend fun run(url: String, args: List<String>, processId: String, onProgress: (Float) -> Unit): String {
         val request = request(url, args)
         val ytdl = YoutubeDL.getInstance()
-        val isSave = isSavePath(processId, args)
         return YtDlp.useUpdated(context) {
-            if (isSave) {
-                YtDlp.ensureFFmpeg(context)
-            }
             YtDlp.retryAfterUpdate(context) {
                 // supervisorScope: with coroutineScope the failed async cancels the scope and the raw YoutubeDLException
                 // comes out instead of the YtDlpException below, so the fetcher never saw stderr (NETWORK went unclassified).
