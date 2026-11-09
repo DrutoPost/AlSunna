@@ -44,9 +44,11 @@ jobs:
       - name: Collect Release APK
         run: |
           mkdir -p release-artifacts
-          find app/build/outputs/apk/release/ -name "*.apk" -exec cp {} release-artifacts/release.apk \; || true
+          find app/build/outputs/apk/release/ -name "*universal*release.apk" -exec cp {} release-artifacts/release.apk \; || true
           if [ ! -f release-artifacts/release.apk ]; then
-            # Universal / first apk fallback
+            find app/build/outputs/apk/release/ -name "*arm64-v8a*release.apk" -exec cp {} release-artifacts/release.apk \; || true
+          fi
+          if [ ! -f release-artifacts/release.apk ]; then
             find app/build/outputs/apk/ -name "*.apk" | head -n 1 | xargs -I {} cp {} release-artifacts/release.apk
           fi
 

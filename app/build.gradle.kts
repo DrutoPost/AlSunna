@@ -57,7 +57,7 @@ android {
             isEnable = true
             reset()
             include("arm64-v8a", "armeabi-v7a", "x86_64")
-            isUniversalApk = false
+            isUniversalApk = true
         }
     }
     packaging { jniLibs { useLegacyPackaging = true } } // youtubedl-android extracts its native Python
@@ -91,8 +91,10 @@ androidComponents {
     onVariants { variant ->
         variant.outputs.forEach { out ->
             val abi = out.filters.firstOrNull { it.filterType == com.android.build.api.variant.FilterConfiguration.FilterType.ABI }?.identifier
-            abi?.let { out.versionCode.set(android.defaultConfig.versionCode!! * 10 + abiDigit.getValue(it)) }
-            if (variant.buildType == "release" && abi == "x86_64") out.enabled.set(false)
+            if (abi != null) {
+                abiDigit[abi]?.let { out.versionCode.set(android.defaultConfig.versionCode!! * 10 + it) }
+                if (variant.buildType == "release" && abi == "x86_64") out.enabled.set(false)
+            }
         }
     }
 }
